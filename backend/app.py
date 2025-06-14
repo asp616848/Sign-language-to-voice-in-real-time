@@ -6,10 +6,8 @@ import tensorflow as tf
 app = Flask(__name__)
 CORS(app)
 
-interpreter = tf.lite.Interpreter(
-    model_path="model.tflite",
-    experimental_delegates=[]  # disables all delegates including XNNPack
-)
+interpreter = tf.lite.Interpreter(model_path="model.tflite")
+
 
 interpreter.allocate_tensors()
 

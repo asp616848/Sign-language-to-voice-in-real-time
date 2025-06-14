@@ -1,9 +1,12 @@
 import requests
-import numpy as np
+import json
 
-# Simulate a single frame: shape [543, 3]
-sequence = np.random.rand(384,708).astype(np.int32).tolist()
+url = "http://127.0.0.1:5000/predict"
 
-res = requests.post("http://127.0.0.1:5000/predict", json={"sequence": sequence})
-print("Status:", res.status_code)
-print("Prediction:", res.json())
+# Generate dummy sequence data [543, 3]
+sequence = [[0.0, 0.0, 0.0] for _ in range(543)]
+
+response = requests.post(url, json={"sequence": sequence})
+
+print("Status code:", response.status_code)
+print("Response:", response.json())
