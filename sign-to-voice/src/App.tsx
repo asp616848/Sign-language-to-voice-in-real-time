@@ -19,8 +19,11 @@ const filteredIndices = {
 };
 
 function App() {
+  const [predictionResult, setPredictionResult] = useState<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [requestPayload, setRequestPayload] = useState<any>(null);
+
   const [landmarkFrames, setLandmarkFrames] = useState<number[][][]>([]);
 
   useEffect(() => {
@@ -119,18 +122,22 @@ function App() {
   }, []);
 
   const sendToBackend = async (landmarks: number[][][]) => {
-    try {
-      const res = await fetch("http://localhost:5000/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ landmarks }),
-      });
-      const data = await res.json();
-      console.log("Prediction:", data.prediction);
-    } catch (err) {
-      console.error("Error:", err);
-    }
-  };
+  try {
+    setRequestPayload(landmarks);  // <-- Store what is being sent
+    const res = await fetch("http://localhost:5000/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ landmarks }),
+    });
+    const data = await res.json();
+    console.log("Prediction:", data.prediction);
+    setPredictionResult(data);  // <-- store the result in state
+  } catch (err) {
+    console.error("Error:", err);
+    setPredictionResult({ error: "Failed to get prediction." });
+  }
+};
+
 
   return (
     <div className="flex flex-col items-center p-4">
@@ -141,6 +148,25 @@ function App() {
       <p className="mt-4 text-gray-600 text-sm">
         Recording 200 frames of filtered landmarks for inference...
       </p>
+      {predictionResult && (
+      <pre className="mt-4 w-full max-w-[640px] bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+        {JSON.stringify(predictionResult, null, 2)}
+      </pre>)}
+      {requestPayload && (
+  <pre className="mt-4 w-full max-w-[640px] bg-yellow-50 p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+    <strong className="block font-semibold mb-1">Request Payload Summary:</strong>
+    {JSON.stringify(
+      {
+        totalFrames: requestPayload.length,
+        pointsPerFrame: requestPayload[0]?.length || 0,
+        firstFrameSample: requestPayload[0]?.slice(0, 200), // show first 5 points only
+      },
+      null,
+      2
+    )}
+  </pre>
+)}
+
     </div>
   );
 }
