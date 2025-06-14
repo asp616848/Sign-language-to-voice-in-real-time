@@ -6,41 +6,46 @@ import tensorflow as tf
 app = Flask(__name__)
 CORS(app)
 
-interpreter = tf.lite.Interpreter(model_path="model.tflite")
+# Load your Keras model
+MODEL_PATH = "results(1)/Kamel_Models/12-14.h5"
+model = tf.keras.models.load_model(MODEL_PATH)
 
-
-interpreter.allocate_tensors()
-
-# Get input/output details
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
-print("Expected model input shape:", interpreter.get_input_details()[0]['shape'])
+# Prediction route
 
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
-        data = request.json['sequence']  # [543, 3]
-        input_data = np.array(data, dtype=np.float32)  # shape: [543, 3]
-        input_data = np.expand_dims(input_data, axis=0)  # [1, 543, 3]
+        data = request.get_json()
+        raw_landmarks = data["landmarks"]  # Should be [200][<=180][3]
 
-        input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
+        # Fix: Ensure each frame has 180 landmarks, pad with [-100, -100, -100]
+        fixed_landmarks = []
+        for frame in raw_landmarks:
+            if len(frame) < 180:
+                pad_len = 180 - len(frame)
+                frame += [[-100, -100, -100]] * pad_len
+            elif len(frame) > 180:
+                frame = frame[:180]
+            fixed_landmarks.append(frame)
 
-        expected_shape = tuple(input_details[0]['shape'])  # [1, 543, 3]
-        if input_data.shape != expected_shape:
-            return jsonify({
-                "error": f"Shape mismatch: got {input_data.shape}, expected {expected_shape}"
-            }), 400
+        if len(fixed_landmarks) < 200:
+            fixed_landmarks += [[[-100, -100, -100]] * 180] * (200 - len(fixed_landmarks))
+        elif len(fixed_landmarks) > 200:
+            fixed_landmarks = fixed_landmarks[:200]
 
-        interpreter.set_tensor(input_details[0]['index'], input_data)
-        interpreter.invoke()
-        output = interpreter.get_tensor(output_details[0]['index'])
+        # Now safe to convert to numpy array
+        landmarks_np = np.array(fixed_landmarks).reshape(1, 200, 180, 3)
 
-        predicted_class = int(np.argmax(output))
-        return jsonify({'prediction': predicted_class})
+        # Predict
+        prediction = model.predict(landmarks_np)
+        predicted_class = int(np.argmax(prediction, axis=-1)[0])
+        print({"\n\npredicted class is":predicted_class})
+        return jsonify({"prediction": predicted_class})
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print("🔥 Exception in /predict route:")
+        print(e)
+        return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
